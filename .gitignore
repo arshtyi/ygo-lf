@@ -1,0 +1,6 @@
+/build/
+/data/
+/public/
+/vendor/
+.venv/
+__pycache__/
