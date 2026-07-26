@@ -21,10 +21,15 @@ except ImportError:
     from render_cards import render_previews
 
 
-def build(typst: str = "typst", ppi: int = 72, skip_fetch: bool = False) -> None:
+def build(
+    typst: str = "typst",
+    ppi: int = 72,
+    skip_fetch: bool = False,
+    ignore_aliases: bool = True,
+) -> None:
     if not skip_fetch:
         assemble()
-    build_limits()
+    build_limits(ignore_aliases=ignore_aliases)
     fetch_images()
     render_previews(typst=typst, ppi=ppi)
 
@@ -57,9 +62,20 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--typst", default="typst")
     parser.add_argument("--ppi", type=int, default=72)
     parser.add_argument("--skip-fetch", action="store_true")
+    parser.add_argument(
+        "--ignore-aliases",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="ignore alternate-art cards whose alias is not 0 (default: true)",
+    )
     return parser.parse_args()
 
 
 if __name__ == "__main__":
     arguments = parse_args()
-    build(arguments.typst, arguments.ppi, arguments.skip_fetch)
+    build(
+        arguments.typst,
+        arguments.ppi,
+        arguments.skip_fetch,
+        arguments.ignore_aliases,
+    )

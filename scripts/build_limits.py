@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Extract original-card forbidden/limited IDs from upstream card data."""
+"""Extract forbidden/limited IDs from upstream card data."""
 
 from __future__ import annotations
 
@@ -64,11 +64,14 @@ def sorted_group_ids(groups: list[list[tuple[tuple[int, tuple[str, ...]], int]]]
     ]
 
 
-def extract_ot(cards: list[dict[str, Any]]) -> tuple[list[list[int]], list[list[int]]]:
+def extract_ot(
+    cards: list[dict[str, Any]],
+    ignore_aliases: bool = True,
+) -> tuple[list[list[int]], list[list[int]]]:
     ocg = [[], [], []]
     tcg = [[], [], []]
     for card in cards:
-        if card.get("alias") != 0:
+        if ignore_aliases and card.get("alias") != 0:
             continue
         identifier = card_id(card, "OT")
         limits = card.get("lf")
@@ -84,10 +87,10 @@ def extract_ot(cards: list[dict[str, Any]]) -> tuple[list[list[int]], list[list[
     return sorted_group_ids(ocg), sorted_group_ids(tcg)
 
 
-def extract_rd(cards: list[dict[str, Any]]) -> list[list[int]]:
+def extract_rd(cards: list[dict[str, Any]], ignore_aliases: bool = True) -> list[list[int]]:
     rd = [[], [], []]
     for card in cards:
-        if card.get("alias") != 0:
+        if ignore_aliases and card.get("alias") != 0:
             continue
         identifier = card_id(card, "RD")
         value = limit_value(card.get("lf"), "RD", identifier)
@@ -96,12 +99,17 @@ def extract_rd(cards: list[dict[str, Any]]) -> list[list[int]]:
     return sorted_group_ids(rd)
 
 
-def build_limits(ot_path: Path = DEFAULT_OT, rd_path: Path = DEFAULT_RD, output: Path = DEFAULT_OUTPUT) -> dict[str, list[list[int]]]:
-    ocg, tcg = extract_ot(load_cards(ot_path))
+def build_limits(
+    ot_path: Path = DEFAULT_OT,
+    rd_path: Path = DEFAULT_RD,
+    output: Path = DEFAULT_OUTPUT,
+    ignore_aliases: bool = True,
+) -> dict[str, list[list[int]]]:
+    ocg, tcg = extract_ot(load_cards(ot_path), ignore_aliases=ignore_aliases)
     result = {
         "ocg": ocg,
         "tcg": tcg,
-        "rd": extract_rd(load_cards(rd_path)),
+        "rd": extract_rd(load_cards(rd_path), ignore_aliases=ignore_aliases),
     }
     output.parent.mkdir(parents=True, exist_ok=True)
     with output.open("w", encoding="utf-8") as destination:
@@ -122,9 +130,20 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--ot", type=Path, default=DEFAULT_OT)
     parser.add_argument("--rd", type=Path, default=DEFAULT_RD)
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
+    parser.add_argument(
+        "--ignore-aliases",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="ignore alternate-art cards whose alias is not 0 (default: true)",
+    )
     return parser.parse_args()
 
 
 if __name__ == "__main__":
     arguments = parse_args()
-    build_limits(arguments.ot, arguments.rd, arguments.output)
+    build_limits(
+        arguments.ot,
+        arguments.rd,
+        arguments.output,
+        ignore_aliases=arguments.ignore_aliases,
+    )
