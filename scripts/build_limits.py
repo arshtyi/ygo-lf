@@ -8,11 +8,10 @@ import json
 from pathlib import Path
 from typing import Any
 
+from paths import LIMITS_FILE, TYPST_WORKSPACE
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_OT = PROJECT_ROOT / "vendor" / "typst-ygo" / "assets" / "ot" / "card" / "ot.json"
-DEFAULT_RD = PROJECT_ROOT / "vendor" / "typst-ygo" / "assets" / "rd" / "card" / "rd.json"
-DEFAULT_OUTPUT = PROJECT_ROOT / "data" / "limits.json"
+DEFAULT_OT = TYPST_WORKSPACE / "assets" / "ot" / "card" / "ot.json"
+DEFAULT_RD = TYPST_WORKSPACE / "assets" / "rd" / "card" / "rd.json"
 CARD_KIND_ORDER = {"怪兽": 0, "魔法": 1, "陷阱": 2}
 
 
@@ -37,7 +36,9 @@ def limit_value(value: Any, source: str, identifier: int) -> int:
     return value
 
 
-def card_type_key(card: dict[str, Any], source: str, identifier: int) -> tuple[int, tuple[str, ...]]:
+def card_type_key(
+    card: dict[str, Any], source: str, identifier: int
+) -> tuple[int, tuple[str, ...]]:
     value = card.get("type")
     if (
         not isinstance(value, list)
@@ -57,7 +58,9 @@ def card_type_key(card: dict[str, Any], source: str, identifier: int) -> tuple[i
     return CARD_KIND_ORDER.get(parts[0], len(CARD_KIND_ORDER)), details
 
 
-def sorted_group_ids(groups: list[list[tuple[tuple[int, tuple[str, ...]], int]]]) -> list[list[int]]:
+def sorted_group_ids(
+    groups: list[list[tuple[tuple[int, tuple[str, ...]], int]]],
+) -> list[list[int]]:
     return [
         [identifier for _, identifier in sorted(group, key=lambda item: item[0])]
         for group in groups
@@ -102,7 +105,7 @@ def extract_rd(cards: list[dict[str, Any]], ignore_aliases: bool = True) -> list
 def build_limits(
     ot_path: Path = DEFAULT_OT,
     rd_path: Path = DEFAULT_RD,
-    output: Path = DEFAULT_OUTPUT,
+    output: Path = LIMITS_FILE,
     ignore_aliases: bool = True,
 ) -> dict[str, list[list[int]]]:
     ocg, tcg = extract_ot(load_cards(ot_path), ignore_aliases=ignore_aliases)
@@ -129,7 +132,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--ot", type=Path, default=DEFAULT_OT)
     parser.add_argument("--rd", type=Path, default=DEFAULT_RD)
-    parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
+    parser.add_argument("--output", type=Path, default=LIMITS_FILE)
     parser.add_argument(
         "--ignore-aliases",
         action=argparse.BooleanOptionalAction,

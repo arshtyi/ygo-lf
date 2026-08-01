@@ -9,33 +9,27 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-try:
-    from .build_limits import build_limits
-    from .fetch_assets import PROJECT_ROOT, prepare_assets
-    from .fetch_images import fetch_images
-    from .render_cards import render_previews
-except ImportError:
-    from build_limits import build_limits
-    from fetch_assets import PROJECT_ROOT, prepare_assets
-    from fetch_images import fetch_images
-    from render_cards import render_previews
+from build_limits import build_limits
+from fetch_images import fetch_images
+from paths import BUILD_DIR, PROJECT_ROOT
+from render_cards import render_previews
+from workspace import prepare_workspace
 
 
 def build(
     typst: str = "typst",
     ppi: int = 72,
-    skip_fetch: bool = False,
+    reuse_workspace: bool = False,
     ignore_aliases: bool = True,
 ) -> None:
-    if not skip_fetch:
-        prepare_assets()
+    if not reuse_workspace:
+        prepare_workspace()
     build_limits(ignore_aliases=ignore_aliases)
     fetch_images()
     render_previews(typst=typst, ppi=ppi)
 
     public = PROJECT_ROOT / "public"
-    public.parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory(prefix="ygo-lf-site-", dir=PROJECT_ROOT / "build") as temp_name:
+    with tempfile.TemporaryDirectory(prefix="ygo-lf-site-", dir=BUILD_DIR) as temp_name:
         staged = Path(temp_name) / "public"
         staged.mkdir()
         subprocess.run(
@@ -61,7 +55,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--typst", default="typst")
     parser.add_argument("--ppi", type=int, default=72)
-    parser.add_argument("--skip-fetch", action="store_true")
+    parser.add_argument("--reuse-workspace", action="store_true")
     parser.add_argument(
         "--ignore-aliases",
         action=argparse.BooleanOptionalAction,
@@ -76,6 +70,6 @@ if __name__ == "__main__":
     build(
         arguments.typst,
         arguments.ppi,
-        arguments.skip_fetch,
+        arguments.reuse_workspace,
         arguments.ignore_aliases,
     )

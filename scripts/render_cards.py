@@ -12,10 +12,8 @@ import tempfile
 from pathlib import Path
 from typing import Iterable
 
+from paths import LIMITS_FILE, PREVIEWS_DIR, PROJECT_ROOT, TYPST_WORKSPACE
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_LIMITS = PROJECT_ROOT / "data" / "limits.json"
-DEFAULT_OUTPUT = PROJECT_ROOT / "build" / "previews"
 PAGE_NUMBER = re.compile(r"page-(\d+)\.png$")
 
 
@@ -23,14 +21,16 @@ def ordered_unique(groups: Iterable[Iterable[int]]) -> list[int]:
     return list(dict.fromkeys(identifier for group in groups for identifier in group))
 
 
-def typst_source(environment: str, identifiers: list[int]) -> str:
+def typst_source(environment: str, identifiers: list[int], workspace: Path) -> str:
     if environment not in {"ot", "rd"}:
         raise ValueError(f"unsupported card environment: {environment}")
     card_function = f"{environment}-card"
     cards_function = f"{environment}-cards"
     values = ", ".join(str(identifier) for identifier in identifiers)
+    module = (workspace / "lib" / "mod.typ").relative_to(PROJECT_ROOT)
+    module_path = "/" + module.as_posix()
     return (
-        '#import "/vendor/typst-ygo/lib/mod.typ": '
+        f'#import "{module_path}": '
         f"{card_function}, {cards_function}\n\n"
         f"#let cards = {cards_function}()\n"
         f"#let ids = ({values},)\n\n"
@@ -53,18 +53,21 @@ def compile_environment(
     identifiers: list[int],
     ppi: int,
     work: Path,
+    workspace: Path,
 ) -> Path:
     if not identifiers:
         raise ValueError(f"no restricted {environment.upper()} cards to render")
 
     source = work / f"{environment}.typ"
-    source.write_text(typst_source(environment, identifiers), encoding="utf-8")
+    source.write_text(
+        typst_source(environment, identifiers, workspace), encoding="utf-8"
+    )
     output = work / "previews" / environment
     output.mkdir(parents=True)
     pattern = output / "page-{0p}.png"
     fonts = [
-        PROJECT_ROOT / "vendor" / "typst-ygo" / "assets" / "ot" / "font",
-        PROJECT_ROOT / "vendor" / "typst-ygo" / "assets" / "rd" / "font",
+        workspace / "assets" / "ot" / "font",
+        workspace / "assets" / "rd" / "font",
     ]
     command = [typst, "compile", "--root", str(PROJECT_ROOT)]
     for font_path in fonts:
@@ -84,16 +87,18 @@ def compile_environment(
 
 
 def render_previews(
-    limits_path: Path = DEFAULT_LIMITS,
-    output: Path = DEFAULT_OUTPUT,
+    limits_path: Path = LIMITS_FILE,
+    output: Path = PREVIEWS_DIR,
     typst: str = "typst",
     ppi: int = 72,
+    workspace: Path = TYPST_WORKSPACE,
 ) -> None:
     if not 36 <= ppi <= 144:
         raise ValueError("preview PPI must be between 36 and 144")
     with limits_path.open(encoding="utf-8") as source:
         limits = json.load(source)
 
+    workspace = workspace.resolve()
     ot_ids = ordered_unique((*limits["ocg"], *limits["tcg"]))
     rd_ids = ordered_unique(limits["rd"])
     output = output.resolve()
@@ -101,8 +106,8 @@ def render_previews(
 
     with tempfile.TemporaryDirectory(prefix="ygo-lf-render-", dir=output.parent) as temp_name:
         work = Path(temp_name)
-        compile_environment(typst, "ot", ot_ids, ppi, work)
-        compile_environment(typst, "rd", rd_ids, ppi, work)
+        compile_environment(typst, "ot", ot_ids, ppi, work, workspace)
+        compile_environment(typst, "rd", rd_ids, ppi, work, workspace)
         staged = work / "previews"
         if output.exists():
             shutil.rmtree(output)
@@ -113,8 +118,9 @@ def render_previews(
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--limits", type=Path, default=DEFAULT_LIMITS)
-    parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
+    parser.add_argument("--limits", type=Path, default=LIMITS_FILE)
+    parser.add_argument("--output", type=Path, default=PREVIEWS_DIR)
+    parser.add_argument("--workspace", type=Path, default=TYPST_WORKSPACE)
     parser.add_argument("--typst", default="typst")
     parser.add_argument("--ppi", type=int, default=72)
     return parser.parse_args()
@@ -122,4 +128,10 @@ def parse_args() -> argparse.Namespace:
 
 if __name__ == "__main__":
     arguments = parse_args()
-    render_previews(arguments.limits, arguments.output, arguments.typst, arguments.ppi)
+    render_previews(
+        arguments.limits,
+        arguments.output,
+        arguments.typst,
+        arguments.ppi,
+        arguments.workspace,
+    )
