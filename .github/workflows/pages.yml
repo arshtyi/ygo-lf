@@ -1,6 +1,7 @@
 name: Build and deploy banlist PDF
 
 on:
+  pull_request:
   push:
     branches:
       - main
@@ -15,7 +16,7 @@ permissions:
   id-token: write
 
 concurrency:
-  group: pages
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -46,14 +47,17 @@ jobs:
         run: uv run --locked scripts/build.py --ppi 72
 
       - name: Configure Pages
+        if: github.event_name != 'pull_request'
         uses: actions/configure-pages@v6
 
       - name: Upload Pages artifact
+        if: github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@v5
         with:
           path: public
 
   deploy:
+    if: github.event_name != 'pull_request'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

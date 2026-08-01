@@ -13,8 +13,8 @@ from paths import BUILD_DIR, TYPST_WORKSPACE, TYPST_YGO_SOURCE, YGO_ASSETS_SOURC
 
 
 CARD_URLS = {
-    "ot": "https://github.com/arshtyi/ygo-cards/releases/download/latest/ot.json",
-    "rd": "https://github.com/arshtyi/ygo-cards/releases/download/latest/rd.json",
+    "ot": "https://github.com/arshtyi/ygo-cards/releases/latest/download/ot.json",
+    "rd": "https://github.com/arshtyi/ygo-cards/releases/latest/download/rd.json",
 }
 DYNAMIC_ASSET_DIRECTORIES = {"card", "images"}
 
@@ -34,9 +34,7 @@ def require_submodules() -> None:
     ]
     missing = [str(path) for path in required if not path.exists()]
     if missing:
-        raise FileNotFoundError(
-            "submodules are not initialized: " + ", ".join(missing)
-        )
+        raise FileNotFoundError("submodules are not initialized: " + ", ".join(missing))
 
 
 def link_static_assets(source: Path, destination: Path) -> None:
