@@ -26,14 +26,17 @@ def ordered_unique(groups: Iterable[Iterable[int]]) -> list[int]:
 def typst_source(environment: str, identifiers: list[int]) -> str:
     if environment not in {"ot", "rd"}:
         raise ValueError(f"unsupported card environment: {environment}")
-    function_prefix = "ot" if environment == "ot" else "rd"
+    card_function = f"{environment}-card"
+    cards_function = f"{environment}-cards"
     values = ", ".join(str(identifier) for identifier in identifiers)
     return (
         '#import "/vendor/typst-ygo/lib/mod.typ": '
-        f"{function_prefix}_card_by_id, {function_prefix}_card_data\n\n"
-        f"#let cards = {function_prefix}_card_data()\n"
+        f"{card_function}, {cards_function}\n\n"
+        f"#let cards = {cards_function}()\n"
         f"#let ids = ({values},)\n\n"
-        f"#for id in ids {{ {function_prefix}_card_by_id(id, cards: cards) }}\n"
+        "#set page(width: auto, height: auto, margin: 0pt)\n\n"
+        f"#for id in ids {{\n  {card_function}(id, cards: cards)\n"
+        "  pagebreak(weak: true)\n}\n"
     )
 
 
@@ -120,4 +123,3 @@ def parse_args() -> argparse.Namespace:
 if __name__ == "__main__":
     arguments = parse_args()
     render_previews(arguments.limits, arguments.output, arguments.typst, arguments.ppi)
-
