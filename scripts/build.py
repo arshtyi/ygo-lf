@@ -11,12 +11,12 @@ from pathlib import Path
 
 try:
     from .build_limits import build_limits
-    from .fetch_assets import PROJECT_ROOT, assemble
+    from .fetch_assets import PROJECT_ROOT, prepare_assets
     from .fetch_images import fetch_images
     from .render_cards import render_previews
 except ImportError:
     from build_limits import build_limits
-    from fetch_assets import PROJECT_ROOT, assemble
+    from fetch_assets import PROJECT_ROOT, prepare_assets
     from fetch_images import fetch_images
     from render_cards import render_previews
 
@@ -28,7 +28,7 @@ def build(
     ignore_aliases: bool = True,
 ) -> None:
     if not skip_fetch:
-        assemble()
+        prepare_assets()
     build_limits(ignore_aliases=ignore_aliases)
     fetch_images()
     render_previews(typst=typst, ppi=ppi)

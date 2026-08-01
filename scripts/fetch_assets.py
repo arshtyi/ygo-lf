@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Download and assemble the upstream typst-ygo workspace."""
+"""Prepare release assets for the vendored typst-ygo module."""
 
 from __future__ import annotations
 
@@ -15,10 +15,9 @@ from pathlib import Path
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_DESTINATION = PROJECT_ROOT / "vendor" / "typst-ygo"
+DEFAULT_DESTINATION = PROJECT_ROOT / "vendor" / "typst-ygo" / "assets"
 
 DOWNLOADS = {
-    "typst_ygo": "https://github.com/arshtyi/typst-ygo/archive/refs/heads/main.tar.gz",
     "assets": "https://github.com/arshtyi/ygo-assets/releases/download/latest/assets.tar.xz",
     "ot": "https://github.com/arshtyi/ygo-cards/releases/download/latest/ot.json",
     "rd": "https://github.com/arshtyi/ygo-cards/releases/download/latest/rd.json",
@@ -55,34 +54,36 @@ def safe_extract(archive_path: Path, destination: Path) -> None:
         archive.extractall(destination, members=members, filter="data")
 
 
-def single_directory(path: Path, expected_name: str | None = None) -> Path:
-    directories = [item for item in path.iterdir() if item.is_dir()]
-    files = [item for item in path.iterdir() if item.is_file()]
-    if expected_name:
-        expected = path / expected_name
-        if expected.is_dir():
-            return expected
-    if len(directories) != 1 or files:
-        raise ValueError(f"expected one archive root directory in {path}")
-    return directories[0]
+def find_asset_root(path: Path) -> Path:
+    candidates = [path / "assets", path]
+    candidates.extend(item for item in path.iterdir() if item.is_dir())
+    for candidate in candidates:
+        if all((candidate / environment).is_dir() for environment in ("ot", "rd")):
+            return candidate
+    raise ValueError("asset archive must contain OT and RD directories")
 
 
-def assemble(destination: Path = DEFAULT_DESTINATION) -> None:
+def prepare_assets(destination: Path = DEFAULT_DESTINATION) -> None:
     destination = destination.resolve()
-    destination.parent.mkdir(parents=True, exist_ok=True)
+    module_path = destination.parent / "lib" / "mod.typ"
+    if not module_path.is_file():
+        raise FileNotFoundError(
+            f"typst-ygo submodule is not initialized: {module_path}"
+        )
 
-    with tempfile.TemporaryDirectory(prefix="ygo-lf-", dir=destination.parent) as temp_name:
+    build_directory = PROJECT_ROOT / "build"
+    build_directory.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="ygo-lf-assets-", dir=build_directory) as temp_name:
         temp = Path(temp_name)
         downloads = temp / "downloads"
         downloads.mkdir()
         paths = {
-            "typst_ygo": downloads / "typst-ygo.tar.gz",
             "assets": downloads / "assets.tar.xz",
             "ot": downloads / "ot.json",
             "rd": downloads / "rd.json",
         }
 
-        print("Downloading typst-ygo, card data, and card assets...")
+        print("Downloading card data and card assets...")
         with ThreadPoolExecutor(max_workers=len(DOWNLOADS)) as executor:
             futures = [
                 executor.submit(download, DOWNLOADS[name], paths[name])
@@ -91,48 +92,37 @@ def assemble(destination: Path = DEFAULT_DESTINATION) -> None:
             for future in futures:
                 future.result()
 
-        typst_extract = temp / "typst-extract"
         assets_extract = temp / "assets-extract"
-        typst_extract.mkdir()
         assets_extract.mkdir()
-        safe_extract(paths["typst_ygo"], typst_extract)
         safe_extract(paths["assets"], assets_extract)
 
-        upstream_root = single_directory(typst_extract)
-        staged = temp / "typst-ygo"
-        shutil.copytree(upstream_root, staged)
-
-        extracted_assets = assets_extract / "assets"
-        if not extracted_assets.is_dir():
-            if (assets_extract / "ot").is_dir() and (assets_extract / "rd").is_dir():
-                extracted_assets = assets_extract
-            else:
-                extracted_assets = single_directory(assets_extract)
-        shutil.copytree(extracted_assets, staged / "assets", dirs_exist_ok=True)
+        staged = temp / "assets"
+        shutil.copytree(find_asset_root(assets_extract), staged)
 
         card_paths = {
-            "ot": staged / "assets" / "ot" / "card" / "ot.json",
-            "rd": staged / "assets" / "rd" / "card" / "rd.json",
+            "ot": staged / "ot" / "card" / "ot.json",
+            "rd": staged / "rd" / "card" / "rd.json",
         }
         for name, card_path in card_paths.items():
             card_path.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(paths[name], card_path)
 
         required = [
-            staged / "lib" / "mod.typ",
-            staged / "assets" / "ot" / "images",
-            staged / "assets" / "rd" / "images",
+            staged / "ot" / "font",
+            staged / "ot" / "images",
+            staged / "rd" / "font",
+            staged / "rd" / "images",
             *card_paths.values(),
         ]
         missing = [str(path.relative_to(staged)) for path in required if not path.exists()]
         if missing:
-            raise FileNotFoundError("upstream workspace is incomplete: " + ", ".join(missing))
+            raise FileNotFoundError("upstream assets are incomplete: " + ", ".join(missing))
 
         if destination.exists():
             shutil.rmtree(destination)
         shutil.move(staged, destination)
 
-    print(f"Prepared typst-ygo workspace at {destination}")
+    print(f"Prepared typst-ygo assets at {destination}")
 
 
 def parse_args() -> argparse.Namespace:
@@ -142,4 +132,4 @@ def parse_args() -> argparse.Namespace:
 
 
 if __name__ == "__main__":
-    assemble(parse_args().destination)
+    prepare_assets(parse_args().destination)
